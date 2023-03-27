@@ -11,28 +11,12 @@ local IsValid = IsValid
 
 module( 'carry_same_weapons', package.seeall )
 
-local ENTITY = FindMetaTable( 'Entity' )
-
--- I tried to do it differently, but the meta-call dominates the object's meta-table.
-ENTITY.__GetClass = ENTITY.__GetClass or ENTITY.GetClass
-function ENTITY:GetClass()
-    if self[ addonName ] then
-        local className = self.__ClassName
-        if ( className ~= nil ) then
-            return className
-        end
-    end
-
-    return self:__GetClass()
-end
-
 function CopySWEP( newClassName, className )
     local data = weapons.GetStored( className )
     if not data then return false end
 
     local swep = {
-        [ 'Base' ] = className,
-        [ addonName ] = true
+        [ 'Base' ] = className
     }
 
     for key, value in pairs( data ) do
@@ -44,6 +28,13 @@ function CopySWEP( newClassName, className )
 
     swep.DisableDuplicator = true
     swep.Spawnable = false
+
+    local base = swep.Base
+    if swep.ArcCW or base:match( '^arccw_.+$') then
+        swep.PresetBase = swep.PresetBase or className
+    end
+
+    swep[ addonName ] = true
 
     weapons.Register( swep, newClassName )
 
@@ -190,7 +181,6 @@ if SERVER then
                 local ply = playerGive[ index ]
                 if IsValid( ply ) then
                     ply:PickupWeapon( ent )
-
                     timer_Simple( 0.25, function()
                         if not IsValid( ply ) then return end
                         if not IsValid( ent ) then return end
@@ -213,23 +203,20 @@ if SERVER then
         playerGive[ wep:EntIndex() ] = ply
     end )
 
-    local queue = {}
-    hook.Add( 'PlayerInitialSpawn', addonName, function( ply )
-        queue[ ply ] = true
-    end)
+    gameevent.Listen( 'OnRequestFullUpdate' )
+    hook.Add( 'OnRequestFullUpdate', addonName, function( data )
+        if ( data.networkid == 'BOT' ) then return end
 
-    hook.Add( 'SetupMove', addonName, function( ply, _, cmd )
-        if queue[ ply ] and not cmd:IsForced() then
-            queue[ ply ] = nil
+        local ply = Player( data.userid )
+        if not IsValid( ply ) then return end
 
-            for newClassName, className in pairs( Weapons ) do
-                net.Start( addonName )
-                    net.WriteString( newClassName )
-                    net.WriteString( className )
-                net.Broadcast()
-            end
+        for newClassName, className in pairs( Weapons ) do
+            net.Start( addonName )
+                net.WriteString( newClassName )
+                net.WriteString( className )
+            net.Send( ply )
         end
-    end)
+    end )
 
 end
 
@@ -246,7 +233,7 @@ hook.Add( 'EntityRemoved', addonName, function( ent )
     if not ent[ addonName ] then return end
 
     local realClassName = ent.__RealClassName
-    local className = ent:GetClass()
+    local className = ent.__ClassName
 
     timer_Simple( 0, function()
         if IsValid( ent ) then return end
