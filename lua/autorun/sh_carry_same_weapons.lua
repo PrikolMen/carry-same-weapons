@@ -11,6 +11,21 @@ local IsValid = IsValid
 
 module( 'carry_same_weapons', package.seeall )
 
+local ENTITY = FindMetaTable( 'Entity' )
+
+-- I tried to do it differently, but the meta-call dominates the object's meta-table.
+ENTITY.__GetClass = ENTITY.__GetClass or ENTITY.GetClass
+function ENTITY:GetClass()
+    if self[ addonName ] then
+        local className = self.__ClassName
+        if ( className ~= nil ) then
+            return className
+        end
+    end
+
+    return self:__GetClass()
+end
+
 function CopySWEP( newClassName, className )
     local data = weapons.GetStored( className )
     if not data then return false end
@@ -183,7 +198,7 @@ hook.Add( 'EntityRemoved', addonName, function( ent )
     if not ent:IsWeapon() then return end
     if not ent[ addonName ] then return end
 
-    local realClassName = ent.__ClassName
+    local realClassName = ent.__RealClassName
     local className = ent:GetClass()
 
     timer_Simple( 0, function()
