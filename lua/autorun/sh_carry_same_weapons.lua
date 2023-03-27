@@ -60,10 +60,10 @@ if SERVER then
         timer_Simple( 0, function()
             if not IsValid( ent ) then return end
 
-            local count = Itrations[ className ] or 0
-            Itrations[ className ] = count + 1
+            local itration = Itrations[ className ] or 0
+            Itrations[ className ] = itration + 1
 
-            local newClassName = className .. '_i' .. count
+            local newClassName = className .. '_iter' .. itration
             if not CopySWEP( newClassName, className ) then return end
             Weapons[ newClassName ] = className
 
@@ -168,14 +168,14 @@ hook.Add( 'EntityRemoved', addonName, function( ent )
         if CLIENT then return end
         Weapons[ realClassName ] = nil
 
-        local count = Itrations[ className ]
-        if not count then return end
-        count = count - 1
+        local itration = Itrations[ className ]
+        if not itration then return end
+        itration = itration - 1
 
-        if ( count < 0 ) then
-            count = 0
+        if ( itration < 0 ) then
+            itration = 0
         end
 
-        Itrations[ className ] = count
+        Itrations[ className ] = itration
     end )
 end )
