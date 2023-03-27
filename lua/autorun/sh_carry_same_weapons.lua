@@ -118,11 +118,23 @@ if SERVER then
             local pos = ent:GetPos()
             local ang = ent:GetAngles()
             local color = ent:GetColor()
+            local index = ent:EntIndex()
+            local model = ent:GetModel()
             local skinNumber = ent:GetSkin()
             local velocity = ent:GetVelocity()
             local material = ent:GetMaterial()
+            local flexScale = ent:GetFlexScale()
 
-            local index = ent:EntIndex()
+            local flexes = {}
+            for flex = 1, ent:GetFlexNum() do
+                flexes[ flex ] = ent:GetFlexWeight( flex )
+            end
+
+            local bodygroups = {}
+            for _, bodygroup in ipairs( ent:GetBodyGroups() ) do
+                bodygroups[ #bodygroups + 1 ] = { bodygroup.id, ent:GetBodygroup( bodygroup.id ) }
+            end
+
 
             ent:Remove()
 
@@ -133,9 +145,22 @@ if SERVER then
                 ent:SetPos( pos )
                 ent:SetAngles( ang )
                 ent:SetColor( color )
+                ent:SetModel( model )
                 ent:SetSkin( skinNumber )
                 ent:SetVelocity( velocity )
                 ent:SetMaterial( material )
+                ent:SetFlexScale( flexScale )
+
+                for flex = 1, ent:GetFlexNum() do
+                    local flexWeight = flexes[ flex ]
+                    if not flexWeight then continue end
+                    ent:SetFlexWeight( flexWeight )
+                end
+
+                for _, bodygroup in ipairs( bodygroups ) do
+                    ent:SetBodygroup( bodygroup[ 1 ], bodygroup[ 2 ] )
+                end
+
 
                 ent:Spawn()
                 ent:Activate()
