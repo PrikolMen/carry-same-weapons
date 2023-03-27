@@ -35,17 +35,47 @@ function CopySWEP( newClassName, className )
     return true
 end
 
-Weapons = {}
-BlackList = {
-    ['gmod_tool'] = true
-}
-
 if SERVER then
+
+    BlackList = {
+        ['gmod_tool'] = true
+    }
+
+    function WriteConfig()
+        file.Write( 'carry_same_weapons.json', util.TableToJSON( {
+            ['ExperimentalMode'] = ExperimentalMode,
+            ['BlackList'] = BlackList
+        }, true ) )
+    end
+
+    function ReadConfig()
+        if file.Exists( 'carry_same_weapons.json', 'DATA' ) then
+            local json = file.Read( 'carry_same_weapons.json', 'DATA' )
+            if ( json ~= nil ) then
+                local tbl = util.JSONToTable( json )
+                if ( tbl ~= nil ) then
+                    return tbl
+                end
+            end
+        end
+
+        WriteConfig()
+    end
+
+    local config = ReadConfig()
+    if ( config ~= nil ) then
+        ExperimentalMode = tobool( config.ExperimentalMode )
+        local blackList = config.BlackList
+        if ( blackList ~= nil ) then
+            table.Merge( BlackList, blackList )
+        end
+    end
 
     util.AddNetworkString( addonName )
 
     local playerGive = {}
     Itrations = {}
+    Weapons = {}
 
     hook.Add( 'OnEntityCreated', addonName, function( ent )
         if not ent:IsWeapon() then return end
