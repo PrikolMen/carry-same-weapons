@@ -52,6 +52,7 @@ end
 
 if SERVER then
 
+    ExperimentalMode = false
     BlackList = {
         ['gmod_tool'] = true
     }
@@ -91,6 +92,20 @@ if SERVER then
     local playerGive = {}
     Itrations = {}
     Weapons = {}
+
+    local function copyDataTable( destination, source )
+        for key, value in pairs( source ) do
+            if ( value == NULL ) then continue end
+            if ( IsEntity( value ) or ispanel( value ) ) and not IsValid( value ) then continue end
+            if isfunction( value ) then continue end
+
+            local dValue = destination[ key ]
+            if ( dValue ~= nil ) and istable( value ) and istable( dValue ) then
+                copyDataTable( dValue, value )
+                continue
+            end
+        end
+    end
 
     hook.Add( 'OnEntityCreated', addonName, function( ent )
         if not ent:IsWeapon() then return end
@@ -135,6 +150,10 @@ if SERVER then
                 bodygroups[ #bodygroups + 1 ] = { bodygroup.id, ent:GetBodygroup( bodygroup.id ) }
             end
 
+            local dataTable = nil
+            if ExperimentalMode then
+                dataTable = ent:GetTable()
+            end
 
             ent:Remove()
 
@@ -161,6 +180,9 @@ if SERVER then
                     ent:SetBodygroup( bodygroup[ 1 ], bodygroup[ 2 ] )
                 end
 
+                if ExperimentalMode then
+                    copyDataTable( ent:GetTable(), dataTable )
+                end
 
                 ent:Spawn()
                 ent:Activate()
