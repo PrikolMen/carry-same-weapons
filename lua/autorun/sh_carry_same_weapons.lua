@@ -24,10 +24,8 @@ function CopySWEP( newClassName, className )
         swep[ key ] = value
     end
 
-    swep.__ClassName = newClassName
-    function swep:GetClass()
-        return className
-    end
+    swep.__RealClassName = newClassName
+    swep.__ClassName = className
 
     swep.DisableDuplicator = true
     swep.Spawnable = false
