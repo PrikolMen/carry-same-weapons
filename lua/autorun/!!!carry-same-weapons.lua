@@ -202,7 +202,7 @@ if SERVER then
         local className = ENTITY_GetClass( weapon )
         if isCustomClass( className ) then return end
 
-        timer_Simple( 0, function()
+        timer_Simple( 0.25, function()
             if not weapon:IsValid() then return end
 
             local owner = weapon:GetOwner()
