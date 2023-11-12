@@ -187,7 +187,7 @@ if SERVER then
             weapon:SetClip2( 0 )
         end
 
-        entity:PickupWeapon( weapon )
+        entity:PickupWeapon( weapon, false )
         return weapon
     end
 
