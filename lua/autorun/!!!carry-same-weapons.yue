@@ -1,0 +1,284 @@
+addonName = "Carry Same Weapons"
+module( addonName, package.seeall )
+classNameBase = "csww"
+
+:match, :find, :format = string
+
+GetAlias = nil
+do
+    pattern = "^" .. classNameBase .. "_%d+_(.+)$"
+    GetAlias = ( className ) ->
+        return match( className, pattern )
+
+IsGeneratedClass = nil
+do
+    pattern = "^" .. classNameBase .. "_%d+_.+$"
+    IsGeneratedClass = ( className ) ->
+        return find( className, pattern ) ~= nil
+
+
+WEAPON = FindMetaTable( "Weapon" )
+ENTITY = FindMetaTable( "Entity" )
+PLAYER = FindMetaTable( "Player" )
+NPC = FindMetaTable( "NPC" )
+NULL = NULL
+
+GetRealClass = ENTITY.GetClass
+GetFakeClass = =>
+    className = GetRealClass( @ )
+
+    alias = GetAlias( className )
+    if alias ~= nil
+        return alias
+
+    return className
+
+WEAPON.GetClass = GetFakeClass
+
+do
+
+    GetWeapon = ( requiredClassName ) =>
+        for weapon in *@GetWeapons!
+            className = GetRealClass( weapon )
+            if className == requiredClassName
+                return weapon
+
+            unless IsGeneratedClass( className )
+                continue
+
+            alias = GetAlias( className )
+            if alias ~= nil and alias == requiredClassName
+                return weapon
+
+        return NULL
+
+    PLAYER.GetWeapon = GetWeapon
+    PLAYER.HasWeapon = ( className ) =>
+        return GetWeapon( @, className )\IsValid!
+
+    if SERVER
+        NPC.GetWeapon = GetWeapon
+
+        selectWeapon = PLAYER_SelectWeapon
+        unless selectWeapon
+            selectWeapon = PLAYER.SelectWeapon
+            global PLAYER_SelectWeapon = selectWeapon
+
+        PLAYER.SelectWeapon = ( className ) =>
+            weapon = GetWeapon( @, className )
+            if weapon\IsValid!
+                return selectWeapon( @, GetRealClass( weapon ) )
+
+        PLAYER.DropNamedWeapon = ( className, ... ) =>
+            weapon = GetWeapon( @, className )
+            if weapon\IsValid!
+                return @DropWeapon( weapon, ... )
+
+do
+    EntIndex = ENTITY.EntIndex
+    WEAPON.__tostring = =>
+        return "Weapon [" .. EntIndex( @ ) .. "][" .. GetFakeClass( @ ) .. "]"
+
+:GetStored, :Register = weapons
+list_Set = list.Set
+hook_Add = hook.Add
+
+if SERVER
+
+    classNames = ClassNames
+    unless classNames
+        classNames = {}
+        global ClassNames = classNames
+
+    pattern = "%s_%d_%s"
+
+    CopyWeapon = ( className ) ->
+        metatable = GetStored( className )
+        unless metatable
+            return
+
+        classes = classNames[ className ]
+        unless classes
+            classes = {}
+            classNames[ className ] = classes
+
+        index = #classes + 1
+        className = format( pattern, classNameBase, index, className )
+        classes[ index ] = className
+
+        Register( metatable, className )
+        list_Set( "Weapon", className, nil )
+        return className
+
+    create = Create
+    unless create
+        create = ents.Create
+        global Create = create
+
+    ents.Create = ( className ) ->
+        unless IsGeneratedClass( className )
+            newClassName = CopyWeapon( className )
+            if newClassName ~= nil
+                className = newClassName
+
+        return create( className )
+
+    createWeapon = ( className ) ->
+        weapon = create( className )
+        if weapon and weapon\IsValid!
+            weapon\Spawn!
+            weapon\Activate!
+            return weapon
+        return NULL
+
+    Give = ( className, noAmmo ) =>
+        unless IsGeneratedClass( className )
+            newClassName = CopyWeapon( className )
+            if newClassName
+                className = newClassName
+
+        weapon = createWeapon( className )
+        unless weapon\IsValid!
+            return weapon
+
+        if noAmmo
+            weapon\SetClip1( 0 )
+            weapon\SetClip2( 0 )
+
+        @PickupWeapon( weapon, false )
+        return weapon
+
+    PLAYER.Give = Give
+    NPC.Give = Give
+
+    timer_Simple = timer.Simple
+
+    hook_Add "OnEntityCreated", addonName, =>
+        unless @IsWeapon! and @IsScripted!
+            return
+
+        className = GetRealClass( @ )
+        if IsGeneratedClass( className )
+            return
+
+        timer_Simple 0.1, ->
+            unless @IsValid!
+                return
+
+            owner = @GetOwner!
+            if owner\IsValid!
+                unless owner\Alive!
+                    return
+
+                entity = Give( owner, className, not owner\HasWeapon( className ) )
+                unless entity\IsValid!
+                    return
+
+            else
+
+                newClassName = CopyWeapon( className )
+                unless newClassName
+                    return
+
+                entity = createWeapon( newClassName )
+                unless entity\IsValid!
+                    return
+
+                entity\SetAngles( @GetAngles! )
+                entity\SetPos( @GetPos! )
+
+                -- Properties Factory
+                entity\SetCollisionGroup( @GetCollisionGroup! )
+                entity\SetMoveType( @GetMoveType! )
+                entity\SetNoDraw( @GetNoDraw! )
+                entity\SetColor( @GetColor! )
+
+                for physNum = 0, entity\GetPhysicsObjectCount! - 1
+                    newPhys = entity\GetPhysicsObjectNum( physNum )
+                    unless newPhys and newPhys\IsValid!
+                        continue
+
+                    oldPhys = @GetPhysicsObjectNum( physNum )
+                    unless oldPhys and oldPhys\IsValid!
+                        continue
+
+                    newPhys\EnableCollisions( oldPhys\IsCollisionEnabled! )
+                    newPhys\EnableMotion( oldPhys\IsMotionEnabled! )
+                    newPhys\EnableDrag( oldPhys\IsDragEnabled! )
+                    newPhys\SetMass( oldPhys\GetMass! )
+
+                    if oldPhys\IsAsleep!
+                        newPhys\Sleep!
+                    else
+                        newPhys\Wake!
+
+                    newPhys\SetVelocity( oldPhys\GetVelocity! )
+
+            @Remove!
+
+    table_RemoveByValue = table.RemoveByValue
+    table_IsEmpty = table.IsEmpty
+
+    hook_Add( "EntityRemoved", addonName, ( fullUpdate ) =>
+        unless @IsWeapon! and @IsScripted! and not fullUpdate
+            return
+
+        className = GetRealClass( @ )
+        unless IsGeneratedClass( className )
+            return
+
+        alias = GetAlias( className )
+        unless alias
+            return
+
+        classes = classNames[ alias ]
+        unless classes
+            return
+
+        table_RemoveByValue( classes, className )
+        if table_IsEmpty( classes )
+            classNames[ alias ] = nil
+
+    )
+
+    hook_Add "PlayerGiveSWEP", addonName, ( className, metatable ) =>
+        if IsGeneratedClass( className )
+            return
+
+        className = CopyWeapon( className )
+        if className ~= nil
+            metatable.ClassName = className
+
+    hook_Add "PlayerSpawnSWEP", addonName, ( className, metatable ) =>
+        if IsGeneratedClass( className )
+            return
+
+        className = CopyWeapon( className )
+        if className ~= nil
+            metatable.ClassName = className
+
+if CLIENT
+
+    hook_Add "OnEntityCreated", addonName, =>
+        unless @IsWeapon! and @IsScripted!
+            return
+
+        className = GetRealClass( @ )
+        unless IsGeneratedClass( className )
+            return
+
+        alias = GetAlias( className )
+        unless alias
+            return
+
+        metatable = GetStored( alias )
+        unless metatable
+            return
+
+        Register( metatable, className )
+        list_Set( "Weapon", className, nil )
+
+hook_Add "PreRegisterSWEP", addonName, ( className ) =>
+    if IsGeneratedClass( className )
+        @DisableDuplicator = true
+        @ClassNameOverride = nil
