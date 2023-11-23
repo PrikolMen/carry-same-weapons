@@ -123,29 +123,27 @@ if SERVER
 
         return create( className )
 
-    createWeapon = ( className ) ->
-        weapon = create( className )
-        if weapon and weapon\IsValid!
-            weapon\Spawn!
-            weapon\Activate!
-            return weapon
-        return NULL
-
     Give = ( className, noAmmo ) =>
         unless IsGeneratedClass( className )
             newClassName = CopyWeapon( className )
             if newClassName
                 className = newClassName
 
-        weapon = createWeapon( className )
-        unless weapon\IsValid!
-            return weapon
+        weapon = create( className )
+        unless weapon and weapon\IsValid!
+            return NULL
 
-        if noAmmo
-            weapon\SetClip1( 0 )
-            weapon\SetClip2( 0 )
+        weapon\SetAngles( @GetAngles! )
+        weapon\SetPos( @GetPos! )
 
-        @PickupWeapon( weapon, false )
+        weapon\Spawn!
+        weapon\Activate!
+
+        if weapon\IsWeapon!
+            if noAmmo
+                weapon\SetClip1( 0 )
+                weapon\SetClip2( 0 )
+            @PickupWeapon( weapon, false )
         return weapon
 
     PLAYER.Give = Give
@@ -180,12 +178,15 @@ if SERVER
                 unless newClassName
                     return
 
-                entity = createWeapon( newClassName )
-                unless entity\IsValid!
+                entity = create( newClassName )
+                unless entity and entity\IsValid!
                     return
 
                 entity\SetAngles( @GetAngles! )
                 entity\SetPos( @GetPos! )
+
+                entity\Spawn!
+                entity\Activate!
 
                 -- Properties Factory
                 entity\SetCollisionGroup( @GetCollisionGroup! )
