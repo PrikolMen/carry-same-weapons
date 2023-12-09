@@ -74,6 +74,16 @@ do
             if weapon\IsValid!
                 return @DropWeapon( weapon, ... )
 
+        stripWeapon = PLAYER_StripWeapon
+        unless stripWeapon
+            stripWeapon = PLAYER.StripWeapon
+            global PLAYER_StripWeapon = stripWeapon
+
+        PLAYER.StripWeapon = ( className ) =>
+            weapon = GetWeapon( @, className )
+            if weapon\IsValid!
+                return stripWeapon( @, GetRealClass( weapon ) )
+
 do
     EntIndex = ENTITY.EntIndex
     WEAPON.__tostring = =>
